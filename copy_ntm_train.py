@@ -3,8 +3,9 @@ import tensorflow as tf
 from datetime import datetime, date, time
 from ntm.NTM import Controller
 from ntm.NTM import NTMCell
-import cv2
+import sys
 import os
+import cv2
 
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_integer("num_layers", "1", "Controller layer size")
@@ -67,7 +68,7 @@ def cross_entropy(p, q):
       p: tensor with dimension ~x1
       q: tensor with dimension ~x1
     """
-    H = -p*tf.log(q) -(1-p)*tf.log(1-q)
+    H = -p*tf.log(tf.clip_by_value(q, 1e-6, 1.0)) -(1-p)*tf.log(tf.clip_by_value(1-q, 1e-6, 1.0))
     return tf.reduce_mean(H)
  
 def img_listup(*img_list):
@@ -100,11 +101,14 @@ def main(args):
 
   x = tf.placeholder(dtype=tf.float32, shape=[FLAGS.batch_size, seq_max, FLAGS.x_size])
   y = tf.placeholder(dtype=tf.float32, shape=[FLAGS.batch_size, seq_max, FLAGS.y_size])
-  out = ntm(x)
+  out, debug_out = ntm(x)
 
+  out = tf.clip_by_value(out, 0.0, 1.0)
   y_ = tf.reshape(y, shape=[-1, 1])
   out_ = tf.reshape(out, shape=[-1, 1])
 
+  out_ = tf.Print(out_, [out_, tf.shape(out_)], message="out_:")
+  y_ = tf.Print(y_, [y_, tf.shape(y_)], message="y_:")
   loss = cross_entropy(out_, y_)
   
   opt = get_opt(loss, "/*")
@@ -141,14 +145,28 @@ def main(args):
 
         x_data, y_data = generate_data(FLAGS.x_size, FLAGS.y_size, seq_max, FLAGS.batch_size)
         feed_dict = {x:x_data, y:y_data}
-        _, loss_val = sess.run([opt, loss], feed_dict)
+        
+#        debug_val = sess.run(debug_out, feed_dict)
+#        print "debug_val:", debug_val.shape
+#        print debug_val
+          
+#        x_val, y_val, out_val = sess.run([x[0], y[0], out[0]], feed_dict)
+#        print y_val
+#        print out_val
+
+        loss_val, _  = sess.run([loss, opt], feed_dict)
         
         print "loss:", loss_val
+#        y__val, out__val = sess.run([y_[0], out_[0]], feed_dict)
+#        print y__val, out__val
         
-        if itr > 1 and itr % 10 == 0:
-          out_val = sess.run(out[0], feed_dict)
 
-          result = img_listup(x_data[0], y_data[0], out_val)
+        if itr > 1 and itr % 10 == 0:
+          x_val, y_val, out_val = sess.run([x[0], y[0], out[0]], feed_dict)
+          #y_val = sess.run(y[0], feed_dict)
+          #out_val = sess.run(out[0], feed_dict)
+          print y_val, out_val
+          result = img_listup(x_val, y_val, out_val)
           cv2.imshow('out', result)
           import scipy.misc
           #scipy.misc.imsave("generated"+current.strftime("%Y%m%d_%H%M%S")+".png", contrastive_sample_val)

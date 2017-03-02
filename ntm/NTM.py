@@ -13,6 +13,7 @@ from tensorflow.python.ops import array_ops
 
 _StateTuple = collections.namedtuple("StateTuple", ("c", "h"))
 
+
 class Controller(RNNCell):
 
   def __init__(self, x_size, h_size, w_mem, num_layers ):
@@ -47,7 +48,7 @@ class Controller(RNNCell):
 
         h = tf.concat(values=[x] + reads, axis=1)
         with tf.variable_scope("cell_%d" % l):
-          ret = rnn_cell._linear([h_prev, h], 4*self.h_size, bias=True, scope="w")
+          ret = rnn_cell._linear([h_prev, h], 4*self.h_size, bias=True)
         _i, _s_new, _f, _o = array_ops.split(value=ret, num_or_size_splits=4, axis=1)
 
         i = sigmoid(_i)
@@ -55,7 +56,7 @@ class Controller(RNNCell):
         s_new = f*s_prev + i*tanh(_s_new)
         o = sigmoid(_o)
         h_new = o*tanh(s_new)
-
+        
         if self.num_layers > 1:
           new_outs.append(h_new)
           new_states.append(_StateTuple(s_new, h_new))
@@ -111,13 +112,21 @@ def circular_convolution(w, s):
 def focus_by_context(beta, k, memory):
   
   def similarity(u, v):
-    norm = tf.norm(u, axis=2, keep_dims=True)*tf.norm(v, axis=2, keep_dims=True)
-    ret = tf.matmul(u, v, transpose_b=True)/norm
+    #norm = tf.norm(u, axis=2, keep_dims=True)*tf.norm(v, axis=2, keep_dims=True)
+    u = u/tf.norm(u, axis=2, keep_dims=True)
+    v = v/tf.norm(v, axis=2, keep_dims=True)
+    u = tf.Print(u, [u], message="u:")
+    v = tf.Print(v, [v], message="v:")
+    #norm = tf.Print(norm, [norm], message="norm:")
+    ret = tf.matmul(u, v, transpose_b=True)
     return ret
 
   k_ = tf.expand_dims(k, axis=1) # expand dim batch x 1 x w_mem
 
+  k_ = tf.Print(k_, [k_], message="k_:")
   _w = similarity(memory, k_) # batch x n_mem x 1
+
+  _w = tf.Print(_w, [_w], message="_w:")
   _w = tf.squeeze(_w, axis=[2]) # batch x n_mem
   _w = beta*_w
   w = tf.nn.softmax(_w)
@@ -139,6 +148,7 @@ def addressing(heads, memory, ws_prev):
     s = head['s']
     gamma = head['gamma']
 
+    #gamma = tf.Print(gamma, [gamma])
     w = focus_by_context(beta, k, memory)
     w = focus_by_location(w, w_prev, s, g, gamma)
     ws.append(w)
@@ -202,13 +212,12 @@ class NTMCell(object):
     dtype = x.dtype
     batch_size = x.get_shape()[0]
     num_step = x.get_shape()[1]
-    size = self.Controller.output_size
     xi_size = sum(self.xi_split_list)
     # unroll LSTM RNN
     outputs = []
 
     with tf.variable_scope("NTM"):
-      self.memory = tf.constant(0.0, dtype=dtype, shape=[batch_size, self.n_mem, self.w_mem])
+      self.memory = tf.constant(0.001, dtype=dtype, shape=[batch_size, self.n_mem, self.w_mem])
       state = self.Controller.zero_state(batch_size, dtype=dtype)
       reads = [init_vector(batch_size, self.w_mem, dtype) for _ in xrange(self.R)]
       read_ws = [init_weight(batch_size, self.n_mem, dtype) for _ in xrange(self.R)]
@@ -257,11 +266,15 @@ class NTMCell(object):
           y = nu + rnn_cell._linear(reads, self.y_size, bias=False)
         outputs.append(y)
         
+        if t==0:
+          debug_out = read_ws[0]
+
         debug_scope()
 
 
+    #debug_out = xi
     #output = tf.reshape(tf.concat(values=outputs, axis=1), [-1, self.y_size])
     output = tf.stack(values=outputs, axis=1)
 
-    return output
+    return output, debug_out
 
