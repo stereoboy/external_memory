@@ -1,3 +1,5 @@
+
+import common.utils as utils
 import tensorflow as tf
 #import tensorflow.contrib.rnn.python.ops.core_rnn_cell as rnn_cell
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell_impl as rnn_cell
@@ -12,7 +14,6 @@ from tensorflow.python.ops.math_ops import tanh
 from tensorflow.python.ops import array_ops
 
 _StateTuple = collections.namedtuple("StateTuple", ("c", "h"))
-
 
 class Controller(RNNCell):
 
@@ -77,9 +78,6 @@ class Controller(RNNCell):
     else:
       return (self.h_size, self.h_size)
 
-def oneplus(x):
-  return (tf.nn.softplus(x) + 1)
-
 def circular_convolution(w, s):
   
   # build NxN matrix
@@ -115,18 +113,18 @@ def focus_by_context(beta, k, memory):
     #norm = tf.norm(u, axis=2, keep_dims=True)*tf.norm(v, axis=2, keep_dims=True)
     u = u/tf.norm(u, axis=2, keep_dims=True)
     v = v/tf.norm(v, axis=2, keep_dims=True)
-    u = tf.Print(u, [u], message="u:")
-    v = tf.Print(v, [v], message="v:")
-    #norm = tf.Print(norm, [norm], message="norm:")
+    #u = utils.print_debug(u, message="u:")
+    #v = utils.print_debug(v, message="v:")
+    #norm = utils.print_debug(norm, message="norm:")
     ret = tf.matmul(u, v, transpose_b=True)
     return ret
 
   k_ = tf.expand_dims(k, axis=1) # expand dim batch x 1 x w_mem
 
-  k_ = tf.Print(k_, [k_], message="k_:")
+  #k_ = utils.print_debug(k_, message="k_:")
   _w = similarity(memory, k_) # batch x n_mem x 1
 
-  _w = tf.Print(_w, [_w], message="_w:")
+  #_w = utils.print_debug(_w, message="_w:")
   _w = tf.squeeze(_w, axis=[2]) # batch x n_mem
   _w = beta*_w
   w = tf.nn.softmax(_w)
@@ -148,7 +146,7 @@ def addressing(heads, memory, ws_prev):
     s = head['s']
     gamma = head['gamma']
 
-    #gamma = tf.Print(gamma, [gamma])
+    #gamma = utils.print_debug(gamma, message="gamma:")
     w = focus_by_context(beta, k, memory)
     w = focus_by_location(w, w_prev, s, g, gamma)
     ws.append(w)
@@ -194,7 +192,7 @@ def debug_scope():
     print item.name
 
 class NTMCell(object):
-  def __init__(self, y_size, batch_size, num_step, Controller, R, W, n_mem, dtype):
+  def __init__(self, y_size, batch_size, Controller, R, W, n_mem, dtype):
     self.Controller = Controller
     self.y_size = y_size
     self.w_mem = self.Controller.w_mem
@@ -247,10 +245,10 @@ class NTMCell(object):
           head = {}
           _k, _beta, _g, _s, _gamma = tf.split(value=params, num_or_size_splits=self.head_split_list, axis=1)
           head['k'] = _k
-          head['beta'] = oneplus(_beta)
+          head['beta'] = utils.oneplus(_beta)
           head['g'] = tf.sigmoid(_g)
           head['s'] = tf.nn.softmax(_s)
-          head['gamma'] = oneplus(_gamma)
+          head['gamma'] = utils.oneplus(_gamma)
           if i < self.R:
             read_heads.append(head)
           else:
@@ -267,10 +265,9 @@ class NTMCell(object):
         outputs.append(y)
         
         if t==0:
-          debug_out = read_ws[0]
+          debug_out = y
 
         debug_scope()
-
 
     #debug_out = xi
     #output = tf.reshape(tf.concat(values=outputs, axis=1), [-1, self.y_size])
