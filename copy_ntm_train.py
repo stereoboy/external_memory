@@ -21,7 +21,7 @@ tf.flags.DEFINE_integer("Reads", "1", "number of read heads")
 tf.flags.DEFINE_integer("Writes", "1", "number of write heads")
 tf.flags.DEFINE_integer("batch_size", "128", "batch_size")
 tf.flags.DEFINE_integer("in_seq_min_len", "5", "input seq max_size")
-tf.flags.DEFINE_integer("in_seq_max_len", "10", "input seq max_size")
+tf.flags.DEFINE_integer("in_seq_max_len", "20", "input seq max_size")
 
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Momentum Optimizer")
 tf.flags.DEFINE_float("momentum", "0.9", "momentum for Momentum Optimizer")
@@ -29,7 +29,7 @@ tf.flags.DEFINE_integer("max_epoch", "10", "maximum iterations for training")
 tf.flags.DEFINE_integer("max_itrs", "10000", "maximum iterations for training")
 
 tf.flags.DEFINE_string("save_dir", "ntm_checkpoints", "dir for checkpoints")
-tf.flags.DEFINE_integer("save_itr", "200", "checkpoint interval")
+tf.flags.DEFINE_integer("save_itr", "100", "checkpoint interval")
 
 
 def generate_data(x_size, y_size, max_seq_size, batch_size):
@@ -157,27 +157,27 @@ def main(args):
 #        print "debug_val:", debug_val.shape
 #        print debug_val
 
-        debug_val, x_val, y_val, out_val = sess.run([debug_out[0], x[0], y[0], out[0]], feed_dict)
-        print y_val
-        print out_val
-        print debug_val
+#        debug_val, x_val, y_val, out_val = sess.run([debug_out[0], x[0], y[0], out[0]], feed_dict)
+#        print y_val
+#        print out_val
+#        print debug_val
 
-        result = img_listup(x_val, y_val, out_val)
-        cv2.imshow('out', result)
-
-        loss_val, _  = sess.run([loss, opt], feed_dict)
+        loss_val, _, out_val = sess.run([loss, opt, out], feed_dict)
 
         print "loss:", loss_val
+        #result = img_listup(x_data[0], y_data[0], out_val[0])
+        #cv2.imshow('out', result)
+
 #        y__val, out__val = sess.run([y_[0], out_[0]], feed_dict)
 #        print y__val, out__val
 
         if itr > 1 and itr % 10 == 0:
 #          x_val, y_val, out_val = sess.run([x[0], y[0], out[0]], feed_dict)
           #y_val = sess.run(y[0], feed_dict)
-          #out_val = sess.run(out[0], feed_dict)
+          #out_val = sess.run(out, feed_dict)
 #          print y_val, out_val
-          #result = img_listup(x_val, y_val, out_val)
-          #cv2.imshow('out', result)
+          result = img_listup(x_data[0], y_data[0], out_val[0])
+          cv2.imshow('out', result)
           import scipy.misc
           #scipy.misc.imsave("generated"+current.strftime("%Y%m%d_%H%M%S")+".png", contrastive_sample_val)
           cv2.imwrite(FLAGS.save_dir + "/generated"+"%02d"%((itr/10)%100)+".png", result)
