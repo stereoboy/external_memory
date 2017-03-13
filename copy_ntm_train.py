@@ -132,6 +132,8 @@ def main(args):
     sess.run(init_op)
 
     # Start input enqueue threads.
+    if not os.path.exists(FLAGS.save_dir):
+      os.makedirs(FLAGS.save_dir)
     saver = tf.train.Saver()
     checkpoint = tf.train.latest_checkpoint(FLAGS.save_dir)
     print "checkpoint: %s" % checkpoint
